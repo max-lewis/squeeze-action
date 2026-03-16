@@ -104,13 +104,14 @@
   try {
     var response = await fetch(url, {
       method: 'POST',
+      mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
 
     spinner.classList.add('hidden');
 
-    if (response.ok) {
+    if (response.ok || response.type === 'opaque') {
       if (action === 'accept') {
         icon.textContent = '✅';
         heading.innerHTML = '<span class="success">Request Accepted</span>';
@@ -149,7 +150,6 @@
           + '?subject=' + encodeURIComponent(emailSubject)
           + '&body=' + encodeURIComponent(emailBody);
 
-        // Auto-open email draft
         setTimeout(function() { window.location.href = mailto; }, 500);
 
         sub.textContent = 'Your email app should open with a draft. If it didn\'t, click below.';
