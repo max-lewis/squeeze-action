@@ -97,17 +97,14 @@
     return;
   }
 
-  var url = action === 'accept' ? webhooks.accept : webhooks.reject;
-  var body = action === 'accept'
-    ? { recordId: recordId }
-    : { recordId: recordId, reason: reason };
+var url = action === 'accept'
+    ? webhooks.accept + '?recordId=' + recordId
+    : webhooks.reject + '?recordId=' + recordId + '&reason=' + reason;
 
   try {
     await fetch(url, {
       method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      mode: 'no-cors'
     });
 
     spinner.classList.add('hidden');
