@@ -75,6 +75,7 @@
   var submitterEmail = params.get('email') || '';
   var requestTitle = params.get('title') || '';
   var requestId = params.get('rid') || '';
+  var redirect = params.get('redirect') || '';
 
   var webhooks = {
     accept: 'https://hooks.airtable.com/workflows/v1/genericWebhook/appprTyeAsLw1idMC/wflqwgJhXdYw0B7NM/wtrfkb1VSdAnFmn6e',
@@ -102,7 +103,7 @@
     : { recordId: recordId, reason: reason };
 
   try {
-    var response = await fetch(url, {
+    await fetch(url, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
@@ -111,53 +112,55 @@
 
     spinner.classList.add('hidden');
 
-    if (response.ok || response.type === 'opaque') {
-      if (action === 'accept') {
-        icon.textContent = '✅';
-        heading.innerHTML = '<span class="success">Request Accepted</span>';
-        message.textContent = 'The request has been added to Legal Requests.';
-      } else {
-        icon.textContent = '🔴';
-        heading.innerHTML = '<span class="rejected">Request Rejected</span>';
-
-        var decodedReason = decodeURIComponent(reason);
-        var decodedTitle = decodeURIComponent(requestTitle);
-        var decodedId = decodeURIComponent(requestId);
-        var decodedSubmitter = decodeURIComponent(submitter);
-        var decodedEmail = decodeURIComponent(submitterEmail);
-
-        message.textContent = 'Reason: ' + decodedReason + '. Opening email draft...';
-
-        var rejectionMessages = {
-          'Incomplete Info': 'Your request is missing information we need to proceed. Please resubmit with complete details, including all required fields and any supporting documents.',
-          'Wrong Request Type': 'The request type selected doesn\'t match what you\'re describing. Please resubmit with the correct request type so we can route it properly.',
-          'Duplicate Request': 'This appears to be a duplicate of an existing request already in progress. If you believe this is a separate matter, please resubmit with a note explaining the distinction.',
-          'Needs Discussion': 'We need to discuss this request before we can move forward. Someone from the legal team will reach out to schedule a call.'
-        };
-
-        var bodyText = rejectionMessages[decodedReason] || 'Your request could not be accepted at this time.';
-
-        var emailSubject = '[Squeeze #' + decodedId + '] Request Returned — ' + decodedReason;
-        var emailBody = 'Hi ' + decodedSubmitter + ',\n\n'
-          + 'Re: "' + decodedTitle + '"\n\n'
-          + 'Your request has been returned for the following reason:\n\n'
-          + decodedReason.toUpperCase() + '\n'
-          + bodyText + '\n\n'
-          + 'Please reply to this email if you have questions or need clarification.\n\n'
-          + 'Lemonjuice Legal';
-
-        var mailto = 'mailto:' + decodedEmail
-          + '?subject=' + encodeURIComponent(emailSubject)
-          + '&body=' + encodeURIComponent(emailBody);
-
-        setTimeout(function() { window.location.href = mailto; }, 500);
-
-        sub.textContent = 'Your email app should open with a draft. If it didn\'t, click below.';
+    if (action === 'accept') {
+      icon.textContent = '✅';
+      heading.innerHTML = '<span class="success">Request Accepted</span>';
+      message.textContent = 'Opening Airtable...';
+      if (redirect) {
+        setTimeout(function() { window.location.href = decodeURIComponent(redirect); }, 800);
+        sub.textContent = 'If Airtable doesn\'t open, click below.';
         sub.classList.remove('hidden');
-        linkArea.innerHTML = '<a class="btn" href="' + mailto + '">Open Email Draft</a>';
+        linkArea.innerHTML = '<a class="btn" href="' + decodeURIComponent(redirect) + '">Open in Airtable</a>';
       }
     } else {
-      throw new Error('Webhook returned ' + response.status);
+      icon.textContent = '🔴';
+      heading.innerHTML = '<span class="rejected">Request Rejected</span>';
+
+      var decodedReason = decodeURIComponent(reason);
+      var decodedTitle = decodeURIComponent(requestTitle);
+      var decodedId = decodeURIComponent(requestId);
+      var decodedSubmitter = decodeURIComponent(submitter);
+      var decodedEmail = decodeURIComponent(submitterEmail);
+
+      message.textContent = 'Reason: ' + decodedReason + '. Opening email draft...';
+
+      var rejectionMessages = {
+        'Incomplete Info': 'Your request is missing information we need to proceed. Please resubmit with complete details, including all required fields and any supporting documents.',
+        'Wrong Request Type': 'The request type selected doesn\'t match what you\'re describing. Please resubmit with the correct request type so we can route it properly.',
+        'Duplicate Request': 'This appears to be a duplicate of an existing request already in progress. If you believe this is a separate matter, please resubmit with a note explaining the distinction.',
+        'Needs Discussion': 'We need to discuss this request before we can move forward. Someone from the legal team will reach out to schedule a call.'
+      };
+
+      var bodyText = rejectionMessages[decodedReason] || 'Your request could not be accepted at this time.';
+
+      var emailSubject = '[Squeeze #' + decodedId + '] Request Returned — ' + decodedReason;
+      var emailBody = 'Hi ' + decodedSubmitter + ',\n\n'
+        + 'Re: "' + decodedTitle + '"\n\n'
+        + 'Your request has been returned for the following reason:\n\n'
+        + decodedReason.toUpperCase() + '\n'
+        + bodyText + '\n\n'
+        + 'Please reply to this email if you have questions or need clarification.\n\n'
+        + 'Lemonjuice Legal';
+
+      var mailto = 'mailto:' + decodedEmail
+        + '?subject=' + encodeURIComponent(emailSubject)
+        + '&body=' + encodeURIComponent(emailBody);
+
+      setTimeout(function() { window.location.href = mailto; }, 500);
+
+      sub.textContent = 'Your email app should open with a draft. If it didn\'t, click below.';
+      sub.classList.remove('hidden');
+      linkArea.innerHTML = '<a class="btn" href="' + mailto + '">Open Email Draft</a>';
     }
   } catch (err) {
     spinner.classList.add('hidden');
