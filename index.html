@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Squeeze</title>
+<style>
+  body {
+    margin: 0; padding: 0;
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    background: #f4f1ea;
+    font-family: Helvetica, Arial, sans-serif;
+  }
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 48px;
+    text-align: center;
+    max-width: 440px;
+    box-shadow: 0 2px 16px rgba(26,39,68,0.08);
+  }
+  .icon { font-size: 48px; margin-bottom: 16px; }
+  h2 {
+    font-family: Georgia, serif;
+    color: #1a2744;
+    font-size: 22px;
+    margin: 0 0 12px;
+  }
+  p { color: #6b6b6b; font-size: 14px; line-height: 1.6; margin: 0; }
+  .sub { margin-top: 8px; font-size: 12px; color: #9a9a9a; }
+  .spinner {
+    width: 24px; height: 24px;
+    border: 3px solid #ede8db;
+    border-top-color: #c8a24e;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 16px auto 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .success { color: #27ae60; }
+  .rejected { color: #c0392b; }
+  .hidden { display: none; }
+  a.btn {
+    display: inline-block;
+    margin-top: 20px;
+    padding: 10px 28px;
+    background: #1a2744;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="icon" id="icon">🍋</div>
+  <h2 id="heading">Processing...</h2>
+  <p id="message">Please wait.</p>
+  <p class="sub hidden" id="sub"></p>
+  <div class="spinner" id="spinner"></div>
+  <div id="linkArea"></div>
+</div>
+
+<script>
+(async function() {
+  var params = new URLSearchParams(window.location.search);
+  var action = params.get('action');
+  var recordId = params.get('recordId');
+  var reason = params.get('reason') || '';
+  var submitter = params.get('submitter') || '';
+  var submitterEmail = params.get('email') || '';
+  var requestTitle = params.get('title') || '';
+  var requestId = params.get('rid') || '';
+
+  var webhooks = {
+    accept: 'https://hooks.airtable.com/workflows/v1/genericWebhook/appprTyeAsLw1idMC/wflqwgJhXdYw0B7NM/wtrfkb1VSdAnFmn6e',
+    reject: 'https://hooks.airtable.com/workflows/v1/genericWebhook/appprTyeAsLw1idMC/wfl537HPPcknutfJC/wtr2tuYddwtRafbs9'
+  };
+
+  var icon = document.getElementById('icon');
+  var heading = document.getElementById('heading');
+  var message = document.getElementById('message');
+  var sub = document.getElementById('sub');
+  var spinner = document.getElementById('spinner');
+  var linkArea = document.getElementById('linkArea');
+
+  if (!action || !recordId) {
+    icon.textContent = '⚠️';
+    heading.textContent = 'Invalid Link';
+    message.textContent = 'This link is missing required parameters.';
+    spinner.classList.add('hidden');
+    return;
+  }
+
+  var url = action === 'accept' ? webhooks.accept : webhooks.reject;
+  var body = action === 'accept'
+    ? { recordId: recordId }
+    : { recordId: recordId, reason: reason };
+
+  try {
+    var response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    spinner.classList.add('hidden');
+
+    if (response.ok) {
+      if (action === 'accept') {
+        icon.textContent = '✅';
+        heading.innerHTML = '<span class="success">Request Accepted</span>';
+        message.textContent = 'The request has been added to Legal Requests.';
+      } else {
+        icon.textContent = '🔴';
+        heading.innerHTML = '<span class="rejected">Request Rejected</span>';
+
+        var decodedReason = decodeURIComponent(reason);
+        var decodedTitle = decodeURIComponent(requestTitle);
+        var decodedId = decodeURIComponent(requestId);
+        var decodedSubmitter = decodeURIComponent(submitter);
+        var decodedEmail = decodeURIComponent(submitterEmail);
+
+        message.textContent = 'Reason: ' + decodedReason + '. Opening email draft...';
+
+        var rejectionMessages = {
+          'Incomplete Info': 'Your request is missing information we need to proceed. Please resubmit with complete details, including all required fields and any supporting documents.',
+          'Wrong Request Type': 'The request type selected doesn\'t match what you\'re describing. Please resubmit with the correct request type so we can route it properly.',
+          'Duplicate Request': 'This appears to be a duplicate of an existing request already in progress. If you believe this is a separate matter, please resubmit with a note explaining the distinction.',
+          'Needs Discussion': 'We need to discuss this request before we can move forward. Someone from the legal team will reach out to schedule a call.'
+        };
+
+        var bodyText = rejectionMessages[decodedReason] || 'Your request could not be accepted at this time.';
+
+        var emailSubject = '[Squeeze #' + decodedId + '] Request Returned — ' + decodedReason;
+        var emailBody = 'Hi ' + decodedSubmitter + ',\n\n'
+          + 'Re: "' + decodedTitle + '"\n\n'
+          + 'Your request has been returned for the following reason:\n\n'
+          + decodedReason.toUpperCase() + '\n'
+          + bodyText + '\n\n'
+          + 'Please reply to this email if you have questions or need clarification.\n\n'
+          + 'Lemonjuice Legal';
+
+        var mailto = 'mailto:' + decodedEmail
+          + '?subject=' + encodeURIComponent(emailSubject)
+          + '&body=' + encodeURIComponent(emailBody);
+
+        // Auto-open email draft
+        setTimeout(function() { window.location.href = mailto; }, 500);
+
+        sub.textContent = 'Your email app should open with a draft. If it didn\'t, click below.';
+        sub.classList.remove('hidden');
+        linkArea.innerHTML = '<a class="btn" href="' + mailto + '">Open Email Draft</a>';
+      }
+    } else {
+      throw new Error('Webhook returned ' + response.status);
+    }
+  } catch (err) {
+    spinner.classList.add('hidden');
+    icon.textContent = '⚠️';
+    heading.textContent = 'Something Went Wrong';
+    message.textContent = 'Error: ' + err.message + '. Please try again or process manually in Airtable.';
+  }
+})();
+</script>
+
+</body>
+</html>
